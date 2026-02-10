@@ -1,9 +1,9 @@
 displayName: OWASP CRS Modsecurity Plugin
 type: middleware
 
-import: github.com/honghainguyen777/traefik-modsecurity-plugin
+import: github.com/kenshaw/traefik-modsecurity-plugin
 
-summary: 'Traefik plugin to proxy requests through owasp/modsecurity-crs'
+summary: "Traefik plugin to proxy requests through owasp/modsecurity-crs"
 
 testData:
   ModsecurityUrl: http://waf:8080

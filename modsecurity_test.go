@@ -3,69 +3,65 @@ package traefik_modsecurity_plugin
 import (
 	"bytes"
 	"context"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
-func TestModsecurity_ServeHTTP(t *testing.T) {
-
-	req, err := http.NewRequest(http.MethodGet, "http://proxy.com/test", bytes.NewBuffer([]byte("Request")))
-
+func TestModsecurity(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://proxy.com/test", strings.NewReader("Request"))
 	if err != nil {
-		log.Fatal(err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
-
-	type response struct {
+	type resp struct {
 		Body       string
 		StatusCode int
 	}
-
-	serviceResponse := response{
-		StatusCode: 200,
+	svcResp := resp{
+		StatusCode: http.StatusOK,
 		Body:       "Response from service",
 	}
-
 	tests := []struct {
-		name            string
-		request         *http.Request
-		wafResponse     response
-		serviceResponse response
-		expectBody      string
-		expectStatus    int
-		jailEnabled     bool
-		jailConfig      *Config
+		name   string
+		req    *http.Request
+		waf    resp
+		svc    resp
+		exp    string
+		status int
+		jailed bool
+		cfg    *Config
 	}{
 		{
-			name:    "Forward request when WAF found no threats",
-			request: req.Clone(req.Context()),
-			wafResponse: response{
-				StatusCode: 200,
+			name: "Forward request when WAF found no threats",
+			req:  req.Clone(t.Context()),
+			waf: resp{
+				StatusCode: http.StatusOK,
 				Body:       "Response from waf",
 			},
-			serviceResponse: serviceResponse,
-			expectBody:      "Response from service",
-			expectStatus:    200,
-			jailEnabled:     false,
+			svc:    svcResp,
+			exp:    "Response from service",
+			status: http.StatusOK,
+			jailed: false,
 		},
 		{
-			name:    "Intercepts request when WAF found threats",
-			request: req.Clone(req.Context()),
-			wafResponse: response{
-				StatusCode: 403,
+			name: "Intercepts request when WAF found threats",
+			req:  req.Clone(t.Context()),
+			waf: resp{
+				StatusCode: http.StatusForbidden,
 				Body:       "Response from waf",
 			},
-			serviceResponse: serviceResponse,
-			expectBody:      "Response from waf",
-			expectStatus:    403,
-			jailEnabled:     false,
+			svc:    svcResp,
+			exp:    "Response from waf",
+			status: http.StatusForbidden,
+			jailed: false,
 		},
 		{
 			name: "Does not forward Websockets",
-			request: &http.Request{
+			req: &http.Request{
 				Body: http.NoBody,
 				Header: http.Header{
 					"Upgrade": []string{"websocket"},
@@ -73,92 +69,108 @@ func TestModsecurity_ServeHTTP(t *testing.T) {
 				Method: http.MethodGet,
 				URL:    req.URL,
 			},
-			wafResponse: response{
-				StatusCode: 200,
+			waf: resp{
+				StatusCode: http.StatusOK,
 				Body:       "Response from waf",
 			},
-			serviceResponse: serviceResponse,
-			expectBody:      "Response from service",
-			expectStatus:    200,
-			jailEnabled:     false,
+			svc:    svcResp,
+			exp:    "Response from service",
+			status: http.StatusOK,
+			jailed: false,
 		},
 		{
-			name:    "Jail client after multiple bad requests",
-			request: req.Clone(req.Context()),
-			wafResponse: response{
-				StatusCode: 403,
+			name: "Jail client after multiple bad requests",
+			req:  req.Clone(t.Context()),
+			waf: resp{
+				StatusCode: http.StatusForbidden,
 				Body:       "Response from waf",
 			},
-			serviceResponse: serviceResponse,
-			expectBody:      "Too Many Requests\n",
-			expectStatus:    http.StatusTooManyRequests,
-			jailEnabled:     true,
-			jailConfig: &Config{
-				JailEnabled:                true,
-				BadRequestsThresholdCount:  3,
-				BadRequestsThresholdPeriodSecs: 10,
-				JailTimeDurationSecs:           10,
+			svc:    svcResp,
+			exp:    "Forbidden\n",
+			status: http.StatusForbidden,
+			jailed: true,
+			cfg: &Config{
+				Jail: &JailConfig{
+					Enabled:          true,
+					BadRequestLimit:  3,
+					BadRequestPeriod: 10 * time.Millisecond,
+					Duration:         10 * time.Millisecond,
+				},
 			},
 		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			modsecurityMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				resp := http.Response{
-					Body:       io.NopCloser(bytes.NewReader([]byte(tt.wafResponse.Body))),
-					StatusCode: tt.wafResponse.StatusCode,
+					Body:       io.NopCloser(strings.NewReader(test.waf.Body)),
+					StatusCode: test.waf.StatusCode,
 					Header:     http.Header{},
 				}
-				log.Printf("WAF Mock: status code: %d, body: %s", resp.StatusCode, tt.wafResponse.Body)
-				forwardResponse(&resp, w)
+				t.Logf("WAF Mock: status code: %d, body: %s", resp.StatusCode, test.waf.Body)
+				forward(w, &resp)
 			}))
-			defer modsecurityMockServer.Close()
-
-			httpServiceHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer srv.Close()
+			svc := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				resp := http.Response{
-					Body:       io.NopCloser(bytes.NewReader([]byte(tt.serviceResponse.Body))),
-					StatusCode: tt.serviceResponse.StatusCode,
+					Body:       io.NopCloser(strings.NewReader(test.svc.Body)),
+					StatusCode: test.svc.StatusCode,
 					Header:     http.Header{},
 				}
-				log.Printf("Service Handler: status code: %d, body: %s", resp.StatusCode, tt.serviceResponse.Body)
-				forwardResponse(&resp, w)
+				t.Logf("Service Handler: status code: %d, body: %s", resp.StatusCode, test.svc.Body)
+				forward(w, &resp)
 			})
-
-			config := &Config{
-				TimeoutMillis:              2000,
-				ModSecurityUrl:             modsecurityMockServer.URL,
-				JailEnabled:                tt.jailEnabled,
-				BadRequestsThresholdCount:  25,
-				BadRequestsThresholdPeriodSecs: 600,
-				JailTimeDurationSecs:           600,
+			cfg := &Config{
+				Timeout:    2 * time.Second,
+				ServiceURL: srv.URL,
+				Jail: &JailConfig{
+					Enabled:          test.jailed,
+					BadRequestLimit:  25,
+					BadRequestPeriod: 600 * time.Millisecond,
+					Duration:         600 * time.Millisecond,
+				},
 			}
-
-			if tt.jailEnabled && tt.jailConfig != nil {
-				config = tt.jailConfig
-				config.ModSecurityUrl = modsecurityMockServer.URL
+			if test.jailed && test.cfg != nil {
+				cfg = test.cfg
+				cfg.ServiceURL = srv.URL
 			}
-
-			middleware, err := New(context.Background(), httpServiceHandler, config, "modsecurity-middleware")
+			mw, err := New(context.Background(), svc, cfg, "modsecurity-middleware")
 			if err != nil {
 				t.Fatalf("Failed to create middleware: %v", err)
 			}
-
-			rw := httptest.NewRecorder()
-
-			for i := 0; i < config.BadRequestsThresholdCount; i++ {
-				middleware.ServeHTTP(rw, tt.request.Clone(tt.request.Context()))
-				if tt.jailEnabled && i < config.BadRequestsThresholdCount-1 {
-					assert.Equal(t, tt.wafResponse.StatusCode, rw.Result().StatusCode)
+			if z, ok := mw.(*Modsecurity); ok {
+				z.l = log.New(logWriter{t}, "", 0)
+			}
+			w := httptest.NewRecorder()
+			for i := 0; i < cfg.Jail.BadRequestLimit; i++ {
+				mw.ServeHTTP(w, test.req.Clone(test.req.Context()))
+				if test.jailed && i < cfg.Jail.BadRequestLimit-1 {
+					if code, exp := w.Result().StatusCode, test.waf.StatusCode; code != exp {
+						t.Errorf("expected %d, got: %d", exp, code)
+					}
 				}
 			}
-
-			rw = httptest.NewRecorder()
-			middleware.ServeHTTP(rw, tt.request.Clone(tt.request.Context()))
-			resp := rw.Result()
+			w = httptest.NewRecorder()
+			mw.ServeHTTP(w, test.req.Clone(test.req.Context()))
+			resp := w.Result()
 			body, _ := io.ReadAll(resp.Body)
-			assert.Equal(t, tt.expectBody, string(body))
-			assert.Equal(t, tt.expectStatus, resp.StatusCode)
+			if s, exp := string(body), test.exp; s != exp {
+				t.Errorf("expected %q, got: %q", exp, s)
+			}
+			if code, exp := resp.StatusCode, test.status; code != exp {
+				t.Errorf("expected %d, got: %d", exp, code)
+			}
 		})
 	}
+}
+
+type logWriter struct {
+	t *testing.T
+}
+
+func (w logWriter) Write(buf []byte) (int, error) {
+	for b := range bytes.SplitSeq(bytes.TrimRight(buf, "\n"), []byte{'\n'}) {
+		w.t.Logf("%s", string(b))
+	}
+	return len(buf), nil
 }
