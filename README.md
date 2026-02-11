@@ -27,7 +27,7 @@ container running [`docker.io/owasp/modsecurity-crs:nginx`][container-repo].
   - [Demo](#demo)
   - [Usage (compose.yaml)](#usage-compose-yaml)
   - [How it works](#how-it-works)
-  - [Local development (docker-compose.local.yml)](#local-development-docker-composelocalyml)
+  - [Local development (compose.local.yml)](#local-development-composelocalyml)
 
 ## Demo
 
