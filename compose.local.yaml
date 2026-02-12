@@ -3,7 +3,8 @@ services:
   traefik:
     image: docker.io/library/traefik:latest
     ports:
-      - 8080:8080
+      - 127.0.0.1:8000:8000
+      - 127.0.0.1:8080:8080
     command:
       - --log.level=DEBUG
       - --accesslog=true
@@ -11,9 +12,9 @@ services:
       - --api.insecure=true
       - --experimental.localPlugins.modsec.moduleName=github.com/kenshaw/traefik-modsec
       - --providers.docker=true
-      - --entrypoints.http.address=:80
+      - --entrypoints.http.address=:8000
     volumes:
-      - $XDG_RUNTIME_DIR/podman/podman.sock:/var/run/docker.sock
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock
       - .:/plugins-local/src/github.com/kenshaw/traefik-modsec
     labels:
       - traefik.enable=true
@@ -24,21 +25,26 @@ services:
 
   modsec:
     image: docker.io/owasp/modsecurity-crs:nginx
+    ports:
+      - 127.0.0.1:9000:8080
     environment:
       - PARANOIA=1
       - ANOMALY_INBOUND=10
       - ANOMALY_OUTBOUND=5
-      - BACKEND=http://dummy
       - REPORTING_LEVEL=2
       - MODSEC_AUDIT_LOG_FORMAT=JSON
       - MODSEC_RULE_ENGINE=On
+      - BACKEND=http://protected-service
+
+  protected-service:
+    image: docker.io/traefik/whoami
 
   website-with-modsec:
     image: docker.io/traefik/whoami
     labels:
       - traefik.enable=true
       - traefik.http.routers.website-with-modsec.rule=PathPrefix(`/website`)
-      - traefik.http.routers.website-with-modsec.middlewares=modsec@docker
+      - traefik.http.routers.website-with-modsec.middlewares=modsec
 
   website:
     image: docker.io/traefik/whoami

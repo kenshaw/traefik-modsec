@@ -5,7 +5,7 @@ import: github.com/kenshaw/traefik-modsec
 
 summary: "Traefik plugin to proxy requests through owasp/modsecurity-crs"
 
-testData:
+testData: {}
 
 iconPath: ./img/icon.png
 bannerPath: ./img/banner.png

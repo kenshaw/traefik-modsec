@@ -1,4 +1,4 @@
-package modsec
+package traefik_modsec
 
 import (
 	"bytes"
@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestModsec(t *testing.T) {
@@ -90,11 +89,11 @@ func TestModsec(t *testing.T) {
 			status: http.StatusForbidden,
 			jailed: true,
 			cfg: &Config{
-				Jail: &JailConfig{
+				Jail: JailConfig{
 					Enabled:          true,
 					BadRequestLimit:  3,
-					BadRequestPeriod: 10 * time.Millisecond,
-					Duration:         10 * time.Millisecond,
+					BadRequestPeriod: "10ms",
+					Duration:         "10ms",
 				},
 			},
 		},
@@ -121,19 +120,20 @@ func TestModsec(t *testing.T) {
 				forward(w, &resp)
 			})
 			cfg := &Config{
-				Timeout:    2 * time.Second,
+				Timeout:    "2s",
 				ServiceURL: srv.URL,
-				Jail: &JailConfig{
+				Jail: JailConfig{
 					Enabled:          test.jailed,
 					BadRequestLimit:  25,
-					BadRequestPeriod: 600 * time.Millisecond,
-					Duration:         600 * time.Millisecond,
+					BadRequestPeriod: "600ms",
+					Duration:         "600ms",
 				},
 			}
 			if test.jailed && test.cfg != nil {
 				cfg = test.cfg
 				cfg.ServiceURL = srv.URL
 			}
+			t.Logf("config: %+v", cfg)
 			mw, err := New(context.Background(), svc, cfg, "modsecurity-middleware")
 			if err != nil {
 				t.Fatalf("Failed to create middleware: %v", err)
@@ -169,7 +169,7 @@ type logWriter struct {
 }
 
 func (w logWriter) Write(buf []byte) (int, error) {
-	for b := range bytes.SplitSeq(bytes.TrimRight(buf, "\n"), []byte{'\n'}) {
+	for _, b := range bytes.Split(bytes.TrimRight(buf, "\n"), []byte{'\n'}) {
 		w.t.Logf("%s", string(b))
 	}
 	return len(buf), nil

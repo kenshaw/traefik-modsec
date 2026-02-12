@@ -3,7 +3,8 @@ services:
   traefik:
     image: docker.io/library/traefik:latest
     ports:
-      - 8080:8080
+      - 127.0.0.1:8000:8000
+      - 127.0.0.1:8080:8080
     command:
       - --log.level=DEBUG
       - --accesslog=true
@@ -12,7 +13,7 @@ services:
       - --experimental.plugins.modsec.modulename=github.com/kenshaw/traefik-modsec
       - --experimental.plugins.modsec.version=v0.1.0
       - --providers.docker=true
-      - --entrypoints.http.address=:80
+      - --entrypoints.http.address=:8000
     volumes:
       - $XDG_RUNTIME_DIR/podman/podman.sock:/var/run/docker.sock
     labels:
@@ -28,17 +29,20 @@ services:
       - PARANOIA=1
       - ANOMALY_INBOUND=10
       - ANOMALY_OUTBOUND=5
-      - BACKEND=http://dummy
+      - BACKEND=http://protected-service
       - REPORTING_LEVEL=2
       - MODSEC_AUDIT_LOG_FORMAT=JSON
       - MODSEC_RULE_ENGINE=On
+
+  protected-service:
+    image: docker.io/traefik/whoami
 
   website-with-modsec:
     image: docker.io/traefik/whoami
     labels:
       - traefik.enable=true
       - traefik.http.routers.website-with-modsec.rule=PathPrefix(`/website`)
-      - traefik.http.routers.website-with-modsec.middlewares=modsec@docker
+      - traefik.http.routers.website-with-modsec.middlewares=modsec
 
   website:
     image: docker.io/traefik/whoami
