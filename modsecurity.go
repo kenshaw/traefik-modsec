@@ -69,7 +69,7 @@ func CreateConfig() *Config {
 	}
 }
 
-// Modsec wraps the .
+// Modsec provides the traefik modsec plugin.
 type Modsec struct {
 	next        http.Handler
 	serviceURL  string
@@ -85,7 +85,7 @@ type Modsec struct {
 	rw          sync.RWMutex
 }
 
-// New creates a new Modsecurity plugin with the given configuration.
+// New creates a new Modsec plugin with the given configuration.
 func New(ctx context.Context, next http.Handler, cfg *Config, name string) (http.Handler, error) {
 	dialer := &net.Dialer{
 		Timeout:   cfg.DialTimeout,
