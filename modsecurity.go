@@ -1,5 +1,6 @@
-// Package traefik_modsecurity_plugin a modsecurity plugin.
-package traefik_modsecurity_plugin
+// Package modsec is a Traefik plugin that proxies requests to a Modsecurity
+// service.
+package modsec
 
 import (
 	"bytes"
@@ -68,8 +69,8 @@ func CreateConfig() *Config {
 	}
 }
 
-// Modsecurity a Modsecurity plugin.
-type Modsecurity struct {
+// Modsec wraps the .
+type Modsec struct {
 	next        http.Handler
 	serviceURL  string
 	name        string
@@ -90,7 +91,7 @@ func New(ctx context.Context, next http.Handler, cfg *Config, name string) (http
 		Timeout:   cfg.DialTimeout,
 		KeepAlive: 30 * time.Second,
 	}
-	return &Modsecurity{
+	return &Modsec{
 		serviceURL: cfg.ServiceURL,
 		next:       next,
 		name:       name,
@@ -118,7 +119,7 @@ func New(ctx context.Context, next http.Handler, cfg *Config, name string) (http
 	}, nil
 }
 
-func (m *Modsecurity) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (m *Modsec) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if isWebsocket(req) {
 		m.next.ServeHTTP(w, req)
 		return
@@ -176,7 +177,7 @@ func (m *Modsecurity) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // markUnhealthy toggles the breaker for the configured back-off window.
-func (m *Modsecurity) markUnhealthy() {
+func (m *Modsec) markUnhealthy() {
 	if m.backoff == 0 {
 		return
 	}
@@ -209,7 +210,7 @@ func forward(w http.ResponseWriter, res *http.Response) {
 	io.Copy(w, res.Body)
 }
 
-func (m *Modsecurity) recordOffense(ip string) {
+func (m *Modsec) recordOffense(ip string) {
 	m.rw.Lock()
 	defer m.rw.Unlock()
 	now := time.Now()
@@ -232,7 +233,7 @@ func (m *Modsecurity) recordOffense(ip string) {
 	}
 }
 
-func (m *Modsecurity) isJailed(ip string) bool {
+func (m *Modsec) isJailed(ip string) bool {
 	if t, exists := m.jailRelease[ip]; exists {
 		if time.Now().Before(t) {
 			return true
@@ -242,7 +243,7 @@ func (m *Modsecurity) isJailed(ip string) bool {
 	return false
 }
 
-func (m *Modsecurity) release(ip string) {
+func (m *Modsec) release(ip string) {
 	m.rw.Lock()
 	defer m.rw.Unlock()
 	delete(m.jailMap, ip)

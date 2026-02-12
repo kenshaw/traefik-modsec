@@ -1,4 +1,4 @@
-package traefik_modsecurity_plugin
+package modsec
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestModsecurity(t *testing.T) {
+func TestModsec(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://proxy.com/test", strings.NewReader("Request"))
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -138,7 +138,7 @@ func TestModsecurity(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create middleware: %v", err)
 			}
-			if z, ok := mw.(*Modsecurity); ok {
+			if z, ok := mw.(*Modsec); ok {
 				z.l = log.New(logWriter{t}, "", 0)
 			}
 			w := httptest.NewRecorder()
