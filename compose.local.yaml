@@ -19,7 +19,7 @@ services:
       - traefik.enable=true
       - traefik.http.services.traefik.loadbalancer.server.port=8080
       - traefik.http.middlewares.modsec.plugin.modsec.jail.enabled=true
-      # use traefiks built-in maxRequestBodyBytes middleware - there's no need for us to bake this ourselves
+      # use built-in maxRequestBodyBytes middleware
       - traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=1048576
 
   modsec:
