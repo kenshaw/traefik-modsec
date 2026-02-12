@@ -53,6 +53,7 @@ $ curl -v http://127.0.0.1/website?test=../etc
 $ curl -v http://127.0.0.1/bypass?test=../etc
 
 # develop/test locally
+$ podman compose -f compose.local.yaml -d
 ```
 
 ## How it works

@@ -1,8 +1,8 @@
+name: traefik_modsecurity
 services:
   traefik:
-    image: docker.io/traefik/traefik:latest
+    image: docker.io/library/traefik:latest
     ports:
-      - 80:80
       - 8080:8080
     command:
       - --log.level=DEBUG
@@ -18,12 +18,11 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.services.traefik.loadbalancer.server.port=8080
+      - traefik.http.middlewares.waf.plugin.modsecurity.jail.enabled=true
       # use traefiks built-in maxRequestBodyBytes middleware - there's no need for us to bake this ourselves
       - traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=1048576
-      - traefik.http.middlewares.waf.plugin.modsecurity.modSecurityUrl=http://waf:8080
-      - traefik.http.middlewares.waf.plugin.modsecurity.jailEnabled=true
 
-  waf:
+  modsec:
     image: docker.io/owasp/modsecurity-crs:nginx
     environment:
       - PARANOIA=1
