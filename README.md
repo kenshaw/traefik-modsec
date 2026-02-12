@@ -51,3 +51,7 @@ $ podman compose -f compose.local.yaml -d
 | `jail.badRequestPeriod` | `600s`               | Sliding-window length for the above threshold.                                                                                                        |
 | `jail.duration`         | `1h`                 | How long a remote ip stays in jail.                                                                                                                   |
 | `backoff`               | `0s`                 | The backoff period when new connections to `serviceUrl` fail.                                                                                         |
+
+##
+
+- See: https://github.com/coreruleset/modsecurity-crs-docker for more information

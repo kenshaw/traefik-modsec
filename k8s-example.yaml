@@ -1,0 +1,54 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: traefik
+  name: modsec
+  labels:
+    app: modsec
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: modsec
+  template:
+    metadata:
+      labels:
+        app: modsec
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: nginx
+          image: docker.io/owasp/modsecurity-crs:nginx
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PARANOIA
+              value: 1
+            - name: ANOMALY_INBOUND
+              value: 10
+            - name: ANOMALY_OUTBOUND
+              value: 5
+            - name: REPORTING_LEVEL
+              value: 2
+            - name: MODSEC_AUDIT_LOG_FORMAT
+              value: JSON
+            - name: MODSEC_RULE_ENGINE
+              value: On
+            - name: BACKEND
+              value: http://my-service.my-namespace.svc.cluster.local:3000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: traefik
+  name: modsec
+spec:
+  selector:
+    app: modsec
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
