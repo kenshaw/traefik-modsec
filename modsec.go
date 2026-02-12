@@ -97,15 +97,15 @@ func New(ctx context.Context, next http.Handler, cfg *Config, name string) (http
 		KeepAlive: 30 * time.Second,
 	}
 	return &Modsec{
-		serviceURL: cfg.ServiceURL,
+		serviceURL: config.ServiceURL,
 		next:       next,
 		name:       name,
 		cl: &http.Client{
 			Timeout: config.Timeout,
 			Transport: &http.Transport{
 				MaxIdleConns:          100,
-				MaxConnsPerHost:       cfg.MaxConns,
-				MaxIdleConnsPerHost:   cfg.MaxIdleConns,
+				MaxConnsPerHost:       config.MaxConns,
+				MaxIdleConnsPerHost:   config.MaxIdleConns,
 				IdleConnTimeout:       config.IdleTimeout,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ExpectContinueTimeout: 1 * time.Second,
@@ -162,6 +162,7 @@ func (m *Modsec) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	req.Body = io.NopCloser(bytes.NewReader(body))
+	// m.l.Printf("Sending %s %s -- %q", req.Method, m.serviceURL+req.RequestURI, m.serviceURL)
 	proxyReq, err := http.NewRequest(req.Method, m.serviceURL+req.RequestURI, bytes.NewReader(body))
 	if err != nil {
 		m.l.Printf("fail to prepare forwarded request: %v", err)

@@ -20,19 +20,22 @@ services:
       - traefik.enable=true
       - traefik.http.services.traefik.loadbalancer.server.port=8080
       - traefik.http.middlewares.modsec.plugin.modsec.jail.enabled=true
+      - traefik.http.middlewares.modsec.plugin.modsec.jail.badRequestLimit=3
       # use built-in maxRequestBodyBytes middleware
       - traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=1048576
 
   modsec:
     image: docker.io/owasp/modsecurity-crs:nginx
+    ports:
+      - 127.0.0.1:9000:8080
     environment:
       - PARANOIA=1
       - ANOMALY_INBOUND=10
       - ANOMALY_OUTBOUND=5
-      - BACKEND=http://protected-service
       - REPORTING_LEVEL=2
       - MODSEC_AUDIT_LOG_FORMAT=JSON
       - MODSEC_RULE_ENGINE=On
+      - BACKEND=http://protected-service
 
   protected-service:
     image: docker.io/traefik/whoami
